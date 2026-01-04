@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>سامانه پیشرفته تردد کتابخانه</title>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+body{font-family:sans-serif;background:#f0f2f5;margin:0;padding:0}
+.hidden{display:none}
+.box{max-width:600px;margin:60px auto;background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.1);position:relative}
+input,select,button{width:100%;padding:10px;margin-top:10px;font-size:14px}
+button{background:#1976d2;color:#fff;border:none;border-radius:6px;cursor:pointer;transition:0.2s;display:flex;align-items:center;justify-content:center;gap:8px}
+button:hover{background:#155a9c}
+.nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#007BFF;border-radius:12px 12px 0 0;overflow:hidden;margin:0 20px 20px 20px;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+.nav button{flex:1;color:#fff;border:none;padding:15px 0;font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:#007BFF;transition:0.2s}
+.nav button:hover{background:#0056b3}
+.card{background:#fff;padding:10px;margin:10px 0;border-radius:8px;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,0.1)}
+.actions{display:flex;gap:10px;margin-top:15px}
+.actions button{flex:1;padding:15px 0;font-size:14px}
+.scrollable{max-height:350px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+table th, table td{border:1px solid #ccc;padding:8px;text-align:right}
+table th{background:#eee}
+#logo{display:block;margin:0 auto 10px auto;max-width:250px}
+#footerText{text-align:center;color:#555;margin-bottom:20px;font-size:12px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login" class="box">
+<h3>ورود به سیستم</h3>
+<input id="loginId" placeholder="ID" />
+<button id="loginBtn"><i class="fas fa-sign-in-alt"></i> ورود</button>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+<img id="logo" src="https://uploadkon.ir/uploads/1e8804_26IMG-%DB%B2%DB%B0%DB%B2%DB%B6%DB%B0%DB%B1%DB%B0%DB%B5-%DB%B0%DB%B1%DB%B0%DB%B7%DB%B3%DB%B9.png" alt="Logo" />
+<div id="footerText">ساخته شده توسط تیم برنامه نویسی نسل آفتاب</div>
+<div id="home" class="box"></div>
+<div id="addStudent" class="box hidden"></div>
+<div id="register" class="box hidden"></div>
+<div id="addCaretaker" class="box hidden"></div>
+<div id="logs" class="box hidden scrollable"></div>
+<div id="profile" class="box hidden"></div>
+</div>
+
+<div id="nav" class="nav hidden"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+/* ===== DATA ===== */
+let caretakers=JSON.parse(localStorage.getItem('caretakers')||'[{"id":"h4fy6587df1","name":"علی عسکرپور","phone":"09051185359","role":"caretaker"}]');
+let students=JSON.parse(localStorage.getItem('students')||'[{"id":"stu001","name":"محمد احمدی","parent":"09120000000","role":"student"}]');
+let logs=JSON.parse(localStorage.getItem('logs')||'[]');
+let currentUser=null;
+
+/* ===== DOM ELEMENTS ===== */
+const loginDiv=document.getElementById('login');
+const loginBtn=document.getElementById('loginBtn');
+const appDiv=document.getElementById('app');
+const navDiv=document.getElementById('nav');
+const homeDiv=document.getElementById('home');
+const addStudentDiv=document.getElementById('addStudent');
+const addCaretakerDiv=document.getElementById('addCaretaker');
+const registerDiv=document.getElementById('register');
+const logsDiv=document.getElementById('logs');
+const profileDiv=document.getElementById('profile');
+
+/* ===== REGISTER ===== */
+let currentType='';
+function openRegister(t){ currentType=t; show('register'); renderRegister(); }
+function renderRegister(){
+ registerDiv.innerHTML=`<h3>ثبت ${currentType}</h3>
+ <select id='studentSelect'>${students.map(s=>`<option value='${s.id}'>${s.name}</option>`).join('')}</select>
+ <button id='saveLogBtn'><i class="fas fa-check"></i> ثبت</button>`;
+ document.getElementById('saveLogBtn').addEventListener('click', saveLog);
+}
+function saveLog(){
+ const studentSelect=document.getElementById('studentSelect');
+ const s=students.find(x=>x.id===studentSelect.value);
+ if(!s)return Swal.fire('خطا','دانش‌آموز یافت نشد','error');
+ const dt=new Date();
+ const dtPersian=dt.toLocaleString('fa-IR');
+ const msg=`${s.name} - ${currentType} - ${dtPersian}`;
+ logs.unshift({studentId:s.id,message:msg,date:dt.toISOString()});
+ localStorage.setItem('logs',JSON.stringify(logs));
+ Swal.fire('ثبت شد',msg,'success');
+ renderLogs();
+ show('home');
+}
+
+/* ===== LOGIN ===== */
+loginBtn.addEventListener('click', () => {
+ const id=document.getElementById('loginId').value.trim();
+ currentUser=caretakers.find(u=>u.id===id)||students.find(u=>u.id===id);
+ if(!currentUser) return Swal.fire('خطا','ID نامعتبر','error');
+ loginDiv.classList.add('hidden');
+ appDiv.classList.remove('hidden');
+ navDiv.classList.remove('hidden');
+ renderNav();
+ renderHome();
+ renderProfile();
+});
+
+/* ===== NAV ===== */
+function renderNav(){
+ navDiv.innerHTML='';
+ navDiv.append(createButton('خانه',()=>show('home'), 'fas fa-home'));
+ if(currentUser.role==='caretaker'){
+  navDiv.append(createButton('ثبت تردد',()=>openRegister('ورود'), 'fas fa-sign-in-alt'));
+  navDiv.append(createButton('افزودن فرد',()=>show('addStudent'), 'fas fa-user-plus'));
+  if(currentUser.id==='h4fy6587df1'){
+    navDiv.append(createButton('افزودن مراقب',()=>show('addCaretaker'), 'fas fa-user-shield'));
+  }
+  navDiv.append(createButton('ترددها',()=>{show('logs');renderLogs();}, 'fas fa-list'));
+ }
+ navDiv.append(createButton('مشخصات',()=>show('profile'), 'fas fa-id-card'));
+}
+
+function createButton(text,action,iconClass){
+ const btn=document.createElement('button');
+ btn.innerHTML=`<i class='${iconClass}'></i>${text}`;
+ btn.onclick=action;
+ return btn;
+}
+
+/* ===== HOME ===== */
+function renderHome(){
+ homeDiv.innerHTML='<h3>صفحه اصلی</h3>';
+ if(currentUser.role==='caretaker'){
+  homeDiv.innerHTML+=`<div class='actions'>
+   <button id='homeEnterBtn'><i class="fas fa-sign-in-alt"></i> ورود</button>
+   <button id='homeExitBtn'><i class="fas fa-sign-out-alt"></i> خروج</button>
+  </div>`;
+  document.getElementById('homeEnterBtn').addEventListener('click', ()=>openRegister('ورود'));
+  document.getElementById('homeExitBtn').addEventListener('click', ()=>openRegister('خروج'));
+ } else {
+  homeDiv.innerHTML+='<p>به پنل دانش‌آموز خوش آمدید</p>';
+  renderLogs();
+  show('logs');
+ }
+}
+
+/* ===== ADD STUDENT ===== */
+function renderAddStudent(){
+ addStudentDiv.innerHTML=`<h3>مدیریت دانش‌آموزان</h3>
+ <input id='sn' placeholder='نام و نام خانوادگی'>
+ <input id='sid2' placeholder='ID دانش‌آموز'>
+ <input id='sp' placeholder='شماره والدین'>
+ <button id='addStuBtn'><i class="fas fa-user-plus"></i> افزودن</button>
+ <button id='removeStuBtn' style='background:#dc3545; margin-top:10px'><i class="fas fa-user-times"></i> حذف دانش‌آموز</button>`;
+ document.getElementById('addStuBtn').addEventListener('click', addStu);
+ document.getElementById('removeStuBtn').addEventListener('click', removeStu);
+}
+function addStu(){
+ const nameInput=document.getElementById('sn');
+ const idInput=document.getElementById('sid2');
+ const phoneInput=document.getElementById('sp');
+ if(!nameInput.value||!idInput.value||!phoneInput.value){ return Swal.fire('خطا','همه فیلدها را پر کنید','error'); }
+ students.push({id:idInput.value,name:nameInput.value,parent:phoneInput.value,role:'student'});
+ localStorage.setItem('students',JSON.stringify(students));
+ Swal.fire('اضافه شد','دانش‌آموز با موفقیت اضافه شد','success');
+ renderAddStudent(); renderRegister(); show('home');
+}
+function removeStu(){
+ const idInput=document.getElementById('sid2');
+ const index=students.findIndex(s=>s.id===idInput.value);
+ if(index===-1){ return Swal.fire('خطا','دانش‌آموز یافت نشد','error'); }
+ students.splice(index,1);
+ localStorage.setItem('students',JSON.stringify(students));
+ Swal.fire('حذف شد','دانش‌آموز با موفقیت حذف شد','success');
+ renderAddStudent(); renderRegister(); show('home');
+}
+
+/* ===== ADD CARETAKER ===== */
+function renderAddCaretaker(){
+ addCaretakerDiv.innerHTML=`<h3>افزودن مراقب جدید</h3>
+ <input id='cn' placeholder='نام و نام خانوادگی'>
+ <input id='cid' placeholder='ID مراقب'>
+ <input id='cp' placeholder='شماره تماس'>
+ <button id='addCaretakerBtn'><i class="fas fa-user-shield"></i> افزودن</button>
+ <button id='removeCaretakerBtn' style='background:#dc3545; margin-top:10px'><i class="fas fa-user-times"></i> حذف مراقب</button>`;
+ document.getElementById('addCaretakerBtn').addEventListener('click', addCaretaker);
+ document.getElementById('removeCaretakerBtn').addEventListener('click', removeCaretaker);
+}
+function addCaretaker(){
+ const nameInput=document.getElementById('cn');
+ const idInput=document.getElementById('cid');
+ const phoneInput=document.getElementById('cp');
+ if(!nameInput.value||!idInput.value||!phoneInput.value){ return Swal.fire('خطا','همه فیلدها را پر کنید','error'); }
+ caretakers.push({id:idInput.value,name:nameInput.value,phone:phoneInput.value,role:'caretaker'});
+ localStorage.setItem('caretakers',JSON.stringify(caretakers));
+ Swal.fire('اضافه شد','مراقب جدید با موفقیت اضافه شد','success');
+ renderAddCaretaker(); renderRegister(); show('home');
+}
+function removeCaretaker(){
+ const idInput=document.getElementById('cid');
+ const index=caretakers.findIndex(c=>c.id===idInput.value);
+ if(index===-1){ return Swal.fire('خطا','مراقب یافت نشد','error'); }
+ caretakers.splice(index,1);
+ localStorage.setItem('caretakers',JSON.stringify(caretakers));
+ Swal.fire('حذف شد','مراقب با موفقیت حذف شد','success');
+ renderAddCaretaker(); renderRegister(); show('home');
+}
+
+/* ===== LOGS ===== */
+function renderLogs(){
+ logsDiv.innerHTML='';
+ const filteredLogs=logs.filter(l=>currentUser.role==='caretaker'||l.studentId===currentUser.id);
+ if(filteredLogs.length===0){ logsDiv.innerHTML='<p>ترددی ثبت نشده است</p>'; return; }
+ const table=document.createElement('table');
+ table.innerHTML=`<tr><th>نام</th><th>وضعیت</th><th>تاریخ و ساعت</th></tr>`;
+ filteredLogs.forEach(l=>{
+  const parts=l.message.split(' - ');
+  const row=document.createElement('tr');
+  row.innerHTML=`<td>${parts[0]}</td><td>${parts[1]}</td><td>${parts[2]}</td>`;
+  table.appendChild(row);
+ });
+ logsDiv.appendChild(table);
+}
+
+/* ===== PROFILE ===== */
+function renderProfile(){ profileDiv.innerHTML=`<h3>مشخصات</h3><p>نام: ${currentUser.name}</p><p>ID: ${currentUser.id}</p>`; }
+
+/* ===== UTIL ===== */
+function show(id){
+ ['home','register','addStudent','addCaretaker','logs','profile'].forEach(x=>document.getElementById(x).classList.add('hidden'));
+ const el=document.getElementById(id);
+ if(el) el.classList.remove('hidden');
+ if(id==='addStudent') renderAddStudent();
+ if(id==='addCaretaker') renderAddCaretaker();
+}
+
+});
+</script>
+</body>
+</html>
